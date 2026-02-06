@@ -203,6 +203,7 @@ R2 storage uses a backup/restore approach for simplicity:
 **During operation:**
 - A cron job runs every 5 minutes to sync the moltbot config to R2
 - You can also trigger a manual backup from the admin UI at `/_admin/`
+ - Workspace files under `/root/clawd` (e.g., MEMORY.md) are synced to R2, excluding `/root/clawd/skills`
 
 **In the admin UI:**
 - When R2 is configured, you'll see "Last backup: [timestamp]"

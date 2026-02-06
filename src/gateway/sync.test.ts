@@ -114,6 +114,9 @@ describe('syncToR2', () => {
       expect(rsyncCall).toContain('--delete');
       expect(rsyncCall).toContain('/root/.openclaw/');
       expect(rsyncCall).toContain('/root/.clawdbot/');
+      expect(rsyncCall).toContain('/root/clawd/');
+      expect(rsyncCall).toContain('/data/moltbot/clawd/');
+      expect(rsyncCall).toContain("--exclude='skills/'");
       expect(rsyncCall).toContain('/data/moltbot/');
     });
   });
