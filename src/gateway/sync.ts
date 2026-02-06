@@ -17,7 +17,7 @@ export interface SyncResult {
  * This function:
  * 1. Mounts R2 if not already mounted
  * 2. Verifies source has critical files (prevents overwriting good backup with empty data)
- * 3. Runs rsync to copy config to R2
+ * 3. Runs rsync to copy config/workspace to R2
  * 4. Writes a timestamp file for tracking
  * 
  * @param sandbox - The sandbox instance
@@ -60,13 +60,15 @@ export async function syncToR2(sandbox: Sandbox, env: MoltbotEnv): Promise<SyncR
     };
   }
 
-  // Run rsync to backup config to R2
+  // Run rsync to backup config/workspace to R2
   // Note: Use --no-times because s3fs doesn't support setting timestamps
   const syncCmd =
     `if [ -d /root/.openclaw ]; then ` +
       `rsync -r --no-times --delete --exclude='*.lock' --exclude='*.log' --exclude='*.tmp' /root/.openclaw/ ${R2_MOUNT_PATH}/openclaw/; fi && ` +
     `if [ -d /root/.clawdbot ]; then ` +
       `rsync -r --no-times --delete --exclude='*.lock' --exclude='*.log' --exclude='*.tmp' /root/.clawdbot/ ${R2_MOUNT_PATH}/clawdbot/; fi && ` +
+    `if [ -d /root/clawd ]; then ` +
+      `rsync -r --no-times --delete --exclude='skills/' /root/clawd/ ${R2_MOUNT_PATH}/clawd/; fi && ` +
     `if [ -d /root/clawd/skills ]; then ` +
       `rsync -r --no-times --delete /root/clawd/skills/ ${R2_MOUNT_PATH}/skills/; fi && ` +
     `date -Iseconds > ${R2_MOUNT_PATH}/.last-sync`;
@@ -77,7 +79,7 @@ export async function syncToR2(sandbox: Sandbox, env: MoltbotEnv): Promise<SyncR
 
     // Check for success by reading the timestamp file
     // (process status may not update reliably in sandbox API)
-    // Note: backup structure is ${R2_MOUNT_PATH}/openclaw/, ${R2_MOUNT_PATH}/clawdbot/ and ${R2_MOUNT_PATH}/skills/
+    // Note: backup structure is ${R2_MOUNT_PATH}/openclaw/, ${R2_MOUNT_PATH}/clawdbot/, ${R2_MOUNT_PATH}/clawd/ and ${R2_MOUNT_PATH}/skills/
     const timestampProc = await sandbox.startProcess(`cat ${R2_MOUNT_PATH}/.last-sync`);
     await waitForProcess(timestampProc, 5000);
     const timestampLogs = await timestampProc.getLogs();

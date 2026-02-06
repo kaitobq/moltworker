@@ -73,7 +73,7 @@ echo "Backup directory: $BACKUP_DIR"
 # ============================================================
 # Check if R2 backup exists by looking for openclaw/clawdbot config files
 # The BACKUP_DIR may exist but be empty if R2 was just mounted
-# Note: backup structure is $BACKUP_DIR/openclaw/, $BACKUP_DIR/clawdbot/ and $BACKUP_DIR/skills/
+# Note: backup structure is $BACKUP_DIR/openclaw/, $BACKUP_DIR/clawdbot/, $BACKUP_DIR/clawd/ and $BACKUP_DIR/skills/
 
 # Helper function to check if R2 backup is newer than local
 should_restore_from_r2() {
@@ -143,6 +143,17 @@ else
 fi
 
 select_config_path
+
+# Restore workspace from R2 backup if available (only if R2 is newer)
+CLAWD_DIR="/root/clawd"
+if [ -d "$BACKUP_DIR/clawd" ] && [ "$(ls -A $BACKUP_DIR/clawd 2>/dev/null)" ]; then
+    if should_restore_from_r2; then
+        echo "Restoring workspace from $BACKUP_DIR/clawd..."
+        mkdir -p "$CLAWD_DIR"
+        rsync -r --no-times --exclude='skills/' "$BACKUP_DIR/clawd/." "$CLAWD_DIR/"
+        echo "Restored workspace from R2 backup"
+    fi
+fi
 
 # Restore skills from R2 backup if available (only if R2 is newer)
 SKILLS_DIR="/root/clawd/skills"
