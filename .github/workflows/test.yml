@@ -36,7 +36,6 @@ jobs:
         run: npm test
 
   e2e:
-    if: ${{ (secrets.E2E_CLOUDFLARE_API_TOKEN != '' || secrets.CLOUDFLARE_API_TOKEN != '') && (secrets.E2E_CF_ACCOUNT_ID != '' || secrets.CF_ACCOUNT_ID != '') && (secrets.E2E_WORKERS_SUBDOMAIN != '' || secrets.WORKERS_SUBDOMAIN != '') && (secrets.E2E_CF_ACCESS_TEAM_DOMAIN != '' || secrets.CF_ACCESS_TEAM_DOMAIN != '') && (secrets.E2E_R2_ACCESS_KEY_ID != '' || secrets.R2_ACCESS_KEY_ID != '') && (secrets.E2E_R2_SECRET_ACCESS_KEY != '' || secrets.R2_SECRET_ACCESS_KEY != '') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -96,13 +95,12 @@ jobs:
         continue-on-error: true
         env:
           # Cloud infrastructure credentials (from repo secrets with E2E_ prefix)
-          # Fallback to non-E2E secret names for forks/local repos.
-          CLOUDFLARE_API_TOKEN: ${{ secrets.E2E_CLOUDFLARE_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.E2E_CF_ACCOUNT_ID || secrets.CF_ACCOUNT_ID }}
-          WORKERS_SUBDOMAIN: ${{ secrets.E2E_WORKERS_SUBDOMAIN || secrets.WORKERS_SUBDOMAIN }}
-          CF_ACCESS_TEAM_DOMAIN: ${{ secrets.E2E_CF_ACCESS_TEAM_DOMAIN || secrets.CF_ACCESS_TEAM_DOMAIN }}
-          R2_ACCESS_KEY_ID: ${{ secrets.E2E_R2_ACCESS_KEY_ID || secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.E2E_R2_SECRET_ACCESS_KEY || secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.E2E_CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.E2E_CF_ACCOUNT_ID }}
+          WORKERS_SUBDOMAIN: ${{ secrets.E2E_WORKERS_SUBDOMAIN }}
+          CF_ACCESS_TEAM_DOMAIN: ${{ secrets.E2E_CF_ACCESS_TEAM_DOMAIN }}
+          R2_ACCESS_KEY_ID: ${{ secrets.E2E_R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.E2E_R2_SECRET_ACCESS_KEY }}
           # AI provider — Cloudflare AI Gateway (preferred)
           CLOUDFLARE_AI_GATEWAY_API_KEY: ${{ secrets.CLOUDFLARE_AI_GATEWAY_API_KEY }}
           CF_AI_GATEWAY_ACCOUNT_ID: ${{ secrets.CF_AI_GATEWAY_ACCOUNT_ID }}
