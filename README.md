@@ -301,12 +301,18 @@ npx wrangler secret put CDP_SECRET
 # Enter a secure random string
 ```
 
-2. Set your worker's public URL:
+2. (Recommended) Set your worker's public URL:
 
 ```bash
 npx wrangler secret put WORKER_URL
 # Enter: https://your-worker.workers.dev
 ```
+
+When both `WORKER_URL` and `CDP_SECRET` are set, `start-openclaw.sh` automatically injects:
+
+`browser.profiles.cloudflare.cdpUrl = "https://<worker>/cdp?secret=<CDP_SECRET>"`
+
+If either value is missing, startup continues and browser automation is simply left unconfigured.
 
 3. Redeploy:
 
@@ -318,10 +324,13 @@ npm run deploy
 
 | Endpoint | Description |
 |----------|-------------|
+| `WS /cdp?secret=...` | Backward-compatible WebSocket endpoint |
+| `WS /cdp/devtools/browser/{id}?secret=...` | Browser-level WebSocket endpoint |
+| `WS /cdp/devtools/page/{id}?secret=...` | Page-level WebSocket endpoint |
 | `GET /cdp/json/version` | Browser version information |
+| `GET /cdp/json` | Alias of `/cdp/json/list` |
 | `GET /cdp/json/list` | List available browser targets |
-| `GET /cdp/json/new` | Create a new browser target |
-| `WS /cdp/devtools/browser/{id}` | WebSocket connection for CDP commands |
+| `GET /cdp/json/new` | Create a target placeholder (`?url=` optional) |
 
 All endpoints require authentication via the `?secret=<CDP_SECRET>` query parameter.
 
@@ -468,7 +477,7 @@ npx wrangler secret put BRAVE_API_KEY
 | `SLACK_BOT_TOKEN` | No | Slack bot token |
 | `SLACK_APP_TOKEN` | No | Slack app token |
 | `CDP_SECRET` | No | Shared secret for CDP endpoint authentication (see [Browser Automation](#optional-browser-automation-cdp)) |
-| `WORKER_URL` | No | Public URL of the worker (required for CDP) |
+| `WORKER_URL` | No | Public URL of the worker (used for automatic `browser.profiles.cloudflare.cdpUrl` injection) |
 
 ## Security Considerations
 

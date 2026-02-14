@@ -136,16 +136,20 @@ describe('buildEnvVars', () => {
     expect(result.OPENCLAW_DEV_MODE).toBe('true');
   });
 
-  it('passes optional BRAVE_API_KEY and Cloudflare env vars', () => {
+  it('passes optional BRAVE_API_KEY, CDP, and Cloudflare env vars', () => {
     const env = createMockEnv({
       BRAVE_API_KEY: 'brave-key',
       CF_AI_GATEWAY_MODEL: 'openai/gpt-4o',
       CF_ACCOUNT_ID: 'acct-123',
+      CDP_SECRET: 'cdp-secret',
+      WORKER_URL: 'https://moltbot.example.com',
     });
     const result = buildEnvVars(env);
     expect(result.BRAVE_API_KEY).toBe('brave-key');
     expect(result.CF_AI_GATEWAY_MODEL).toBe('openai/gpt-4o');
     expect(result.CF_ACCOUNT_ID).toBe('acct-123');
+    expect(result.CDP_SECRET).toBe('cdp-secret');
+    expect(result.WORKER_URL).toBe('https://moltbot.example.com');
   });
 
   it('combines env vars correctly', () => {
