@@ -11,3 +11,8 @@ declare module '*.png' {
   const content: string;
   export default content;
 }
+
+declare module '*.cjs' {
+  const content: any;
+  export = content;
+}

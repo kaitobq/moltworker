@@ -48,5 +48,7 @@ OPENCLAW_GATEWAY_TOKEN=dev-token-change-in-prod
 # DISCORD_BOT_TOKEN=optional
 
 # CDP (Chrome DevTools Protocol) configuration for browser automation
+# When both are set, start-openclaw.sh auto-configures:
+# browser.profiles.cloudflare.cdpUrl = https://<worker>/cdp?secret=<CDP_SECRET>
 # CDP_SECRET=shared-secret-for-cdp-auth
 # WORKER_URL=https://your-worker.example.com

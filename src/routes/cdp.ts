@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import type { AppEnv, MoltbotEnv } from '../types';
 import puppeteer, { type Browser, type Page } from '@cloudflare/puppeteer';
 
@@ -22,6 +22,85 @@ import puppeteer, { type Browser, type Page } from '@cloudflare/puppeteer';
  * - Emulation: setDeviceMetricsOverride, setUserAgentOverride
  */
 const cdp = new Hono<AppEnv>();
+const CDP_BROWSER_ID = 'cloudflare-browser';
+const CDP_DEFAULT_TARGET_URL = 'about:blank';
+const SUPPORTED_METHODS = [
+  // Browser
+  'Browser.getVersion',
+  'Browser.close',
+  // Target
+  'Target.createTarget',
+  'Target.closeTarget',
+  'Target.getTargets',
+  'Target.attachToTarget',
+  // Page
+  'Page.navigate',
+  'Page.reload',
+  'Page.captureScreenshot',
+  'Page.getFrameTree',
+  'Page.getLayoutMetrics',
+  'Page.bringToFront',
+  'Page.setContent',
+  'Page.printToPDF',
+  'Page.addScriptToEvaluateOnNewDocument',
+  'Page.removeScriptToEvaluateOnNewDocument',
+  'Page.handleJavaScriptDialog',
+  'Page.stopLoading',
+  'Page.getNavigationHistory',
+  'Page.navigateToHistoryEntry',
+  'Page.setBypassCSP',
+  // Runtime
+  'Runtime.evaluate',
+  'Runtime.callFunctionOn',
+  'Runtime.getProperties',
+  'Runtime.releaseObject',
+  'Runtime.releaseObjectGroup',
+  // DOM
+  'DOM.getDocument',
+  'DOM.querySelector',
+  'DOM.querySelectorAll',
+  'DOM.getOuterHTML',
+  'DOM.getAttributes',
+  'DOM.setAttributeValue',
+  'DOM.focus',
+  'DOM.getBoxModel',
+  'DOM.scrollIntoViewIfNeeded',
+  'DOM.removeNode',
+  'DOM.setNodeValue',
+  'DOM.setFileInputFiles',
+  // Input
+  'Input.dispatchMouseEvent',
+  'Input.dispatchKeyEvent',
+  'Input.insertText',
+  // Network
+  'Network.enable',
+  'Network.disable',
+  'Network.setCacheDisabled',
+  'Network.setExtraHTTPHeaders',
+  'Network.setCookie',
+  'Network.setCookies',
+  'Network.getCookies',
+  'Network.deleteCookies',
+  'Network.clearBrowserCookies',
+  'Network.setUserAgentOverride',
+  // Fetch (Request Interception)
+  'Fetch.enable',
+  'Fetch.disable',
+  'Fetch.continueRequest',
+  'Fetch.fulfillRequest',
+  'Fetch.failRequest',
+  'Fetch.getResponseBody',
+  // Emulation
+  'Emulation.setDeviceMetricsOverride',
+  'Emulation.clearDeviceMetricsOverride',
+  'Emulation.setUserAgentOverride',
+  'Emulation.setGeolocationOverride',
+  'Emulation.clearGeolocationOverride',
+  'Emulation.setTimezoneOverride',
+  'Emulation.setTouchEmulationEnabled',
+  'Emulation.setEmulatedMedia',
+  'Emulation.setDefaultBackgroundColorOverride',
+] as const;
 
 /**
  * CDP Message types
@@ -43,6 +122,11 @@ interface CDPEvent {
   params?: Record<string, unknown>;
 }
 
+interface AuthorizedCdpRequest {
+  url: URL;
+  secret: string;
+}
+
 /**
  * Session state for a CDP connection
  */
@@ -60,99 +144,20 @@ interface CDPSession {
   pendingRequests: Map<string, { request: Request; resolve: (response: Response) => void }>;
 }
 
-/**
- * GET /cdp - WebSocket upgrade endpoint
- *
- * Connect with: ws://host/cdp?secret=<CDP_SECRET>
- */
-cdp.get('/', async (c) => {
-  // Check for WebSocket upgrade
+function requireCdpWebSocketUpgrade(c: Context<AppEnv>, pathHint: string): Response | null {
   const upgradeHeader = c.req.header('Upgrade');
-  if (upgradeHeader?.toLowerCase() !== 'websocket') {
-    return c.json({
-      error: 'WebSocket upgrade required',
-      hint: 'Connect via WebSocket: ws://host/cdp?secret=<CDP_SECRET>',
-      supported_methods: [
-        // Browser
-        'Browser.getVersion',
-        'Browser.close',
-        // Target
-        'Target.createTarget',
-        'Target.closeTarget',
-        'Target.getTargets',
-        'Target.attachToTarget',
-        // Page
-        'Page.navigate',
-        'Page.reload',
-        'Page.captureScreenshot',
-        'Page.getFrameTree',
-        'Page.getLayoutMetrics',
-        'Page.bringToFront',
-        'Page.setContent',
-        'Page.printToPDF',
-        'Page.addScriptToEvaluateOnNewDocument',
-        'Page.removeScriptToEvaluateOnNewDocument',
-        'Page.handleJavaScriptDialog',
-        'Page.stopLoading',
-        'Page.getNavigationHistory',
-        'Page.navigateToHistoryEntry',
-        'Page.setBypassCSP',
-        // Runtime
-        'Runtime.evaluate',
-        'Runtime.callFunctionOn',
-        'Runtime.getProperties',
-        'Runtime.releaseObject',
-        'Runtime.releaseObjectGroup',
-        // DOM
-        'DOM.getDocument',
-        'DOM.querySelector',
-        'DOM.querySelectorAll',
-        'DOM.getOuterHTML',
-        'DOM.getAttributes',
-        'DOM.setAttributeValue',
-        'DOM.focus',
-        'DOM.getBoxModel',
-        'DOM.scrollIntoViewIfNeeded',
-        'DOM.removeNode',
-        'DOM.setNodeValue',
-        'DOM.setFileInputFiles',
-        // Input
-        'Input.dispatchMouseEvent',
-        'Input.dispatchKeyEvent',
-        'Input.insertText',
-        // Network
-        'Network.enable',
-        'Network.disable',
-        'Network.setCacheDisabled',
-        'Network.setExtraHTTPHeaders',
-        'Network.setCookie',
-        'Network.setCookies',
-        'Network.getCookies',
-        'Network.deleteCookies',
-        'Network.clearBrowserCookies',
-        'Network.setUserAgentOverride',
-        // Fetch (Request Interception)
-        'Fetch.enable',
-        'Fetch.disable',
-        'Fetch.continueRequest',
-        'Fetch.fulfillRequest',
-        'Fetch.failRequest',
-        'Fetch.getResponseBody',
-        // Emulation
-        'Emulation.setDeviceMetricsOverride',
-        'Emulation.clearDeviceMetricsOverride',
-        'Emulation.setUserAgentOverride',
-        'Emulation.setGeolocationOverride',
-        'Emulation.clearGeolocationOverride',
-        'Emulation.setTimezoneOverride',
-        'Emulation.setTouchEmulationEnabled',
-        'Emulation.setEmulatedMedia',
-        'Emulation.setDefaultBackgroundColorOverride',
-      ],
-    });
+  if (upgradeHeader?.toLowerCase() === 'websocket') {
+    return null;
   }
 
-  // Verify secret from query param
+  return c.json({
+    error: 'WebSocket upgrade required',
+    hint: `Connect via WebSocket: ws://host${pathHint}?secret=<CDP_SECRET>`,
+    supported_methods: SUPPORTED_METHODS,
+  });
+}
+
+function authorizeCdpRequest(c: Context<AppEnv>): AuthorizedCdpRequest | Response {
   const url = new URL(c.req.url);
   const providedSecret = url.searchParams.get('secret');
   const expectedSecret = c.env.CDP_SECRET;
@@ -179,6 +184,53 @@ cdp.get('/', async (c) => {
       },
       503,
     );
+  }
+
+  return { url, secret: providedSecret };
+}
+
+function buildWebSocketDebuggerUrl(url: URL, path: string, secret: string): string {
+  const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${wsProtocol}//${url.host}${path}?secret=${encodeURIComponent(secret)}`;
+}
+
+function buildBrowserWebSocketDebuggerUrl(url: URL, secret: string): string {
+  return buildWebSocketDebuggerUrl(url, `/cdp/devtools/browser/${CDP_BROWSER_ID}`, secret);
+}
+
+function buildPageWebSocketDebuggerUrl(url: URL, secret: string): string {
+  return buildWebSocketDebuggerUrl(url, `/cdp/devtools/page/${CDP_BROWSER_ID}`, secret);
+}
+
+function buildTargetDescriptor(url: URL, secret: string, targetUrl: string) {
+  return {
+    description: '',
+    devtoolsFrontendUrl: '',
+    id: CDP_BROWSER_ID,
+    title: 'Cloudflare Browser Rendering',
+    type: 'page',
+    url: targetUrl,
+    webSocketDebuggerUrl: buildPageWebSocketDebuggerUrl(url, secret),
+  };
+}
+
+function parseNewTargetUrl(url: URL): string {
+  const explicitUrl = url.searchParams.get('url');
+  if (explicitUrl) {
+    return explicitUrl;
+  }
+  return CDP_DEFAULT_TARGET_URL;
+}
+
+async function handleWebSocketConnect(c: Context<AppEnv>, pathHint: string): Promise<Response> {
+  const upgradeError = requireCdpWebSocketUpgrade(c, pathHint);
+  if (upgradeError) {
+    return upgradeError;
+  }
+
+  const authResult = authorizeCdpRequest(c);
+  if (authResult instanceof Response) {
+    return authResult;
   }
 
   // Create WebSocket pair
@@ -198,6 +250,29 @@ cdp.get('/', async (c) => {
     status: 101,
     webSocket: client,
   });
+}
+
+/**
+ * GET /cdp - WebSocket upgrade endpoint
+ *
+ * Connect with: ws://host/cdp?secret=<CDP_SECRET>
+ */
+cdp.get('/', async (c) => {
+  return handleWebSocketConnect(c, '/cdp');
+});
+
+/**
+ * GET /devtools/browser/:id - Browser-level CDP WebSocket endpoint
+ */
+cdp.get('/devtools/browser/:id', async (c) => {
+  return handleWebSocketConnect(c, '/cdp/devtools/browser/{id}');
+});
+
+/**
+ * GET /devtools/page/:id - Page-level CDP WebSocket endpoint
+ */
+cdp.get('/devtools/page/:id', async (c) => {
+  return handleWebSocketConnect(c, '/cdp/devtools/page/{id}');
 });
 
 /**
@@ -207,38 +282,10 @@ cdp.get('/', async (c) => {
  * Authentication: Pass secret as query param `?secret=<CDP_SECRET>`
  */
 cdp.get('/json/version', async (c) => {
-  // Verify secret from query param
-  const url = new URL(c.req.url);
-  const providedSecret = url.searchParams.get('secret');
-  const expectedSecret = c.env.CDP_SECRET;
-
-  if (!expectedSecret) {
-    return c.json(
-      {
-        error: 'CDP endpoint not configured',
-        hint: 'Set CDP_SECRET via: wrangler secret put CDP_SECRET',
-      },
-      503,
-    );
+  const authResult = authorizeCdpRequest(c);
+  if (authResult instanceof Response) {
+    return authResult;
   }
-
-  if (!providedSecret || !timingSafeEqual(providedSecret, expectedSecret)) {
-    return c.json({ error: 'Unauthorized' }, 401);
-  }
-
-  if (!c.env.BROWSER) {
-    return c.json(
-      {
-        error: 'Browser Rendering not configured',
-        hint: 'Add browser binding to wrangler.jsonc',
-      },
-      503,
-    );
-  }
-
-  // Build the WebSocket URL - preserve the secret in the WS URL
-  const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${wsProtocol}//${url.host}/cdp?secret=${encodeURIComponent(providedSecret)}`;
 
   return c.json({
     Browser: 'Cloudflare-Browser-Rendering/1.0',
@@ -246,7 +293,7 @@ cdp.get('/json/version', async (c) => {
     'User-Agent': 'Mozilla/5.0 Cloudflare Browser Rendering',
     'V8-Version': 'cloudflare',
     'WebKit-Version': 'cloudflare',
-    webSocketDebuggerUrl: wsUrl,
+    webSocketDebuggerUrl: buildBrowserWebSocketDebuggerUrl(authResult.url, authResult.secret),
   });
 });
 
@@ -259,104 +306,39 @@ cdp.get('/json/version', async (c) => {
  * Authentication: Pass secret as query param `?secret=<CDP_SECRET>`
  */
 cdp.get('/json/list', async (c) => {
-  // Verify secret from query param
-  const url = new URL(c.req.url);
-  const providedSecret = url.searchParams.get('secret');
-  const expectedSecret = c.env.CDP_SECRET;
-
-  if (!expectedSecret) {
-    return c.json(
-      {
-        error: 'CDP endpoint not configured',
-        hint: 'Set CDP_SECRET via: wrangler secret put CDP_SECRET',
-      },
-      503,
-    );
+  const authResult = authorizeCdpRequest(c);
+  if (authResult instanceof Response) {
+    return authResult;
   }
 
-  if (!providedSecret || !timingSafeEqual(providedSecret, expectedSecret)) {
-    return c.json({ error: 'Unauthorized' }, 401);
-  }
-
-  if (!c.env.BROWSER) {
-    return c.json(
-      {
-        error: 'Browser Rendering not configured',
-        hint: 'Add browser binding to wrangler.jsonc',
-      },
-      503,
-    );
-  }
-
-  // Build the WebSocket URL
-  const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${wsProtocol}//${url.host}/cdp?secret=${encodeURIComponent(providedSecret)}`;
-
-  // Return a placeholder target - actual target is created on WS connect
-  return c.json([
-    {
-      description: '',
-      devtoolsFrontendUrl: '',
-      id: 'cloudflare-browser',
-      title: 'Cloudflare Browser Rendering',
-      type: 'page',
-      url: 'about:blank',
-      webSocketDebuggerUrl: wsUrl,
-    },
-  ]);
+  return c.json([buildTargetDescriptor(authResult.url, authResult.secret, CDP_DEFAULT_TARGET_URL)]);
 });
 
 /**
  * GET /json - Alias for /json/list (some clients use this)
  */
 cdp.get('/json', async (c) => {
-  // Redirect internally to /json/list handler
-  const url = new URL(c.req.url);
-  url.pathname = url.pathname.replace(/\/json\/?$/, '/json/list');
-
-  // Verify secret from query param
-  const providedSecret = url.searchParams.get('secret');
-  const expectedSecret = c.env.CDP_SECRET;
-
-  if (!expectedSecret) {
-    return c.json(
-      {
-        error: 'CDP endpoint not configured',
-        hint: 'Set CDP_SECRET via: wrangler secret put CDP_SECRET',
-      },
-      503,
-    );
+  const authResult = authorizeCdpRequest(c);
+  if (authResult instanceof Response) {
+    return authResult;
   }
 
-  if (!providedSecret || !timingSafeEqual(providedSecret, expectedSecret)) {
-    return c.json({ error: 'Unauthorized' }, 401);
+  return c.json([buildTargetDescriptor(authResult.url, authResult.secret, CDP_DEFAULT_TARGET_URL)]);
+});
+
+/**
+ * GET /json/new - Create a target placeholder for CDP compatibility.
+ *
+ * Supports: /json/new?secret=...&url=https://example.com
+ */
+cdp.get('/json/new', async (c) => {
+  const authResult = authorizeCdpRequest(c);
+  if (authResult instanceof Response) {
+    return authResult;
   }
 
-  if (!c.env.BROWSER) {
-    return c.json(
-      {
-        error: 'Browser Rendering not configured',
-        hint: 'Add browser binding to wrangler.jsonc',
-      },
-      503,
-    );
-  }
-
-  // Build the WebSocket URL
-  const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${wsProtocol}//${url.host}/cdp?secret=${encodeURIComponent(providedSecret)}`;
-
-  return c.json([
-    {
-      description: '',
-      devtoolsFrontendUrl: '',
-      id: 'cloudflare-browser',
-      title: 'Cloudflare Browser Rendering',
-      type: 'page',
-      url: 'about:blank',
-      webSocketDebuggerUrl: wsUrl,
-    },
-  ]);
+  const targetUrl = parseNewTargetUrl(authResult.url);
+  return c.json(buildTargetDescriptor(authResult.url, authResult.secret, targetUrl));
 });
 
 /**
