@@ -210,62 +210,6 @@ if (process.env.OPENCLAW_DEV_MODE === 'true') {
     config.gateway.controlUi.allowInsecureAuth = true;
 }
 
-const openaiCodexOAuthEnabled = (() => {
-    const raw = (process.env.OPENAI_CODEX_OAUTH || '').trim().toLowerCase();
-    return raw === '1' || raw === 'true';
-})();
-
-if (openaiCodexOAuthEnabled) {
-    console.log('OPENAI_CODEX_OAUTH is enabled: skipping AI Gateway model/base URL overrides');
-
-    config.models = config.models || {};
-    config.models.providers = config.models.providers || {};
-
-    // Remove stale legacy OpenAI gateway provider from persisted config.
-    const openaiProvider = config.models.providers.openai;
-    if (openaiProvider && typeof openaiProvider === 'object') {
-        const baseUrl = typeof openaiProvider.baseUrl === 'string' ? openaiProvider.baseUrl : '';
-        const hasCfAigAuthorizationHeader = !!(
-            openaiProvider.headers &&
-            typeof openaiProvider.headers === 'object' &&
-            openaiProvider.headers['cf-aig-authorization']
-        );
-        if (
-            baseUrl.includes('gateway.ai.cloudflare.com') ||
-            baseUrl.endsWith('/openai') ||
-            hasCfAigAuthorizationHeader
-        ) {
-            delete config.models.providers.openai;
-            console.log('Removed stale legacy OpenAI gateway provider from config');
-        }
-    }
-
-    // Remove AI Gateway override providers (cf-ai-gw-*).
-    for (const providerName of Object.keys(config.models.providers)) {
-        if (providerName.startsWith('cf-ai-gw-')) {
-            delete config.models.providers[providerName];
-            console.log('Removed stale AI Gateway override provider from config:', providerName);
-        }
-    }
-
-    config.agents = config.agents || {};
-    config.agents.defaults = config.agents.defaults || {};
-    if (config.agents.defaults.models && typeof config.agents.defaults.models === 'object') {
-        delete config.agents.defaults.models['openai/gpt-5.2'];
-        delete config.agents.defaults.models['openai/gpt-5'];
-        delete config.agents.defaults.models['openai/gpt-4.5-preview'];
-    }
-
-    const primaryModel = config.agents.defaults.model?.primary;
-    if (
-        typeof primaryModel === 'string' &&
-        (primaryModel.startsWith('openai/') || primaryModel.startsWith('cf-ai-gw-'))
-    ) {
-        delete config.agents.defaults.model;
-        console.log('Cleared stale default model override in OAuth mode:', primaryModel);
-    }
-}
-
 // Legacy AI Gateway base URL override:
 // Supports:
 // - /openai with optional authenticated gateway header (cf-aig-authorization)
@@ -273,7 +217,7 @@ if (openaiCodexOAuthEnabled) {
 const legacyBaseUrl = (process.env.AI_GATEWAY_BASE_URL || process.env.ANTHROPIC_BASE_URL || '').replace(/\/+$/, '');
 const isLegacyOpenAI = legacyBaseUrl.endsWith('/openai');
 
-if (!openaiCodexOAuthEnabled && isLegacyOpenAI) {
+if (isLegacyOpenAI) {
     console.log('Configuring legacy OpenAI gateway base URL:', legacyBaseUrl);
     config.models = config.models || {};
     config.models.providers = config.models.providers || {};
@@ -299,7 +243,7 @@ if (!openaiCodexOAuthEnabled && isLegacyOpenAI) {
     config.agents.defaults.models['openai/gpt-5'] = { alias: 'GPT-5' };
     config.agents.defaults.models['openai/gpt-4.5-preview'] = { alias: 'GPT-4.5 Preview' };
     config.agents.defaults.model = { primary: 'openai/gpt-5.2' };
-} else if (!openaiCodexOAuthEnabled && legacyBaseUrl) {
+} else if (legacyBaseUrl) {
     console.log('Configuring legacy Anthropic gateway base URL:', legacyBaseUrl);
     config.models = config.models || {};
     config.models.providers = config.models.providers || {};
@@ -331,7 +275,7 @@ if (!openaiCodexOAuthEnabled && isLegacyOpenAI) {
 //   workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast
 //   openai/gpt-4o
 //   anthropic/claude-sonnet-4-5
-if (!openaiCodexOAuthEnabled && process.env.CF_AI_GATEWAY_MODEL) {
+if (process.env.CF_AI_GATEWAY_MODEL) {
     const raw = process.env.CF_AI_GATEWAY_MODEL;
     const slashIdx = raw.indexOf('/');
     const gwProvider = raw.substring(0, slashIdx);
