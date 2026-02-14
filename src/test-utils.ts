@@ -36,7 +36,10 @@ export function createMockProcess(
   stdout: string = '',
   options: { exitCode?: number; stderr?: string; status?: string } = {},
 ): Partial<Process> {
-  const { exitCode = 0, stderr = '', status = 'completed' } = options;
+  const exitCode = Object.prototype.hasOwnProperty.call(options, 'exitCode')
+    ? options.exitCode
+    : 0;
+  const { stderr = '', status = 'completed' } = options;
   return {
     status: status as Process['status'],
     exitCode,
