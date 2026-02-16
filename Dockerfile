@@ -30,12 +30,16 @@ RUN npm install -g openclaw@2026.2.3 \
 RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/.clawdbot \
     && mkdir -p /root/clawd \
-    && mkdir -p /root/clawd/skills
+    && mkdir -p /root/clawd/skills \
+    && mkdir -p /root/clawd/scripts
 
 # Copy startup script
-# Build cache bust: 2026-02-09-v30-legacy-gateway-restore-fix
+# Build cache bust: 2026-02-14-v31-browser-profile-auto-config
 COPY start-openclaw.sh /usr/local/bin/start-openclaw.sh
 RUN chmod +x /usr/local/bin/start-openclaw.sh
+
+# Copy startup helper scripts
+COPY scripts/patch-browser-profile.cjs /root/clawd/scripts/patch-browser-profile.cjs
 
 # Copy custom skills
 COPY skills/ /root/clawd/skills/

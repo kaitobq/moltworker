@@ -3,7 +3,7 @@
 # This script:
 # 1. Restores config from R2 backup if available
 # 2. Runs openclaw onboard --non-interactive to configure from env vars
-# 3. Patches config for features onboard doesn't cover (channels, gateway auth)
+# 3. Patches config for features onboard doesn't cover (channels, gateway auth, browser profile)
 # 4. Starts the gateway
 
 set -e
@@ -152,15 +152,17 @@ else
 fi
 
 # ============================================================
-# PATCH CONFIG (channels, gateway auth, trusted proxies)
+# PATCH CONFIG (channels, gateway auth, trusted proxies, browser profile)
 # ============================================================
 # openclaw onboard handles provider/model config, but we need to patch in:
 # - Channel config (Telegram, Discord, Slack)
 # - Gateway token auth
 # - Trusted proxies for sandbox networking
 # - Base URL override for legacy AI Gateway path
+# - Browser profile cdpUrl for Cloudflare Browser Rendering
 node << 'EOFPATCH'
 const fs = require('fs');
+const { applyCloudflareBrowserProfile } = require('/root/clawd/scripts/patch-browser-profile.cjs');
 
 const configPath = '/root/.openclaw/openclaw.json';
 console.log('Patching config at:', configPath);
@@ -334,6 +336,9 @@ if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_APP_TOKEN) {
         enabled: true,
     };
 }
+
+// Browser Rendering profile (non-fatal if missing/invalid)
+applyCloudflareBrowserProfile(config, process.env, console);
 
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 console.log('Configuration patched successfully');
